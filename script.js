@@ -3,8 +3,10 @@ let currentOTP = null;
 let activityLogs = [];
 let agents = [];
 
-// API Base URL
-const API_BASE_URL = 'http://localhost:3000/api';
+// API Base URL - works for both local and production
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000/api' 
+  : window.location.origin + '/api';
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
