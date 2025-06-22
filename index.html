@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khatabook - Number Change Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="logo">
+                    <div class="khatabook-logo">
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 0C8.95431 0 0 8.95431 0 20C0 31.0457 8.95431 40 20 40C31.0457 40 40 31.0457 40 20C40 8.95431 31.0457 0 20 0Z" fill="#dc2626"/>
+                            <path d="M12 16C12 13.7909 13.7909 12 16 12H24C26.2091 12 28 13.7909 28 16V24C28 26.2091 26.2091 28 24 28H16C13.7909 28 12 26.2091 12 24V16Z" fill="white"/>
+                            <path d="M16 18H24V20H16V18Z" fill="#dc2626"/>
+                            <path d="M16 22H20V24H16V22Z" fill="#dc2626"/>
+                        </svg>
+                        <span class="khatabook-logo-text">Khatabook</span>
+                    </div>
+                </div>
+                <p>Number Change Portal</p>
+            </div>
+            
+            <div class="login-tabs">
+                <button class="tab-btn active" id="agentTab">
+                    <i class="fas fa-user"></i>
+                    Agent Login
+                </button>
+                <button class="tab-btn" id="adminTab">
+                    <i class="fas fa-shield-alt"></i>
+                    Admin Login
+                </button>
+            </div>
+
+            <!-- Agent Login Form -->
+            <form id="agentLoginForm" class="login-form active">
+                <div class="form-group">
+                    <label for="agentId">
+                        <i class="fas fa-id-card"></i>
+                        Agent ID
+                    </label>
+                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agentPassword">
+                        <i class="fas fa-lock"></i>
+                        Password
+                    </label>
+                    <input type="password" id="agentPassword" name="agentPassword" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Login as Agent
+                </button>
+            </form>
+
+            <!-- Admin Login Form -->
+            <form id="adminLoginForm" class="login-form">
+                <div class="form-group">
+                    <label for="adminUsername">
+                        <i class="fas fa-user-shield"></i>
+                        Username
+                    </label>
+                    <input type="text" id="adminUsername" name="adminUsername" placeholder="Enter admin username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="adminPassword">
+                        <i class="fas fa-lock"></i>
+                        Password
+                    </label>
+                    <input type="password" id="adminPassword" name="adminPassword" placeholder="Enter admin password" required>
+                </div>
+                
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Login as Admin
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>&copy; 2025 Khatabook. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
