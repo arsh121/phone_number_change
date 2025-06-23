@@ -40,7 +40,7 @@ async function initializeDataFiles() {
                 name: 'John Doe',
                 password: '$2a$10$rQZ8K9vL2mN3pO4qR5sT6uV7wX8yZ9aA0bB1cC2dE3fF4gG5hH6iI7jJ8kK9lL0mM1nN2oO3pP4qQ5rR6sS7tT8uU9vV0wW1xX2yY3zZ',
                 email: 'john.doe@khatabook.com',
-                phone: '+919876543210',
+                phone: '9876543210',
                 role: 'agent',
                 status: 'active',
                 createdAt: new Date().toISOString(),
@@ -51,7 +51,7 @@ async function initializeDataFiles() {
                 name: 'Jane Smith',
                 password: '$2a$10$rQZ8K9vL2mN3pO4qR5sT6uV7wX8yZ9aA0bB1cC2dE3fF4gG5hH6iI7jJ8kK9lL0mM1nN2oO3pP4qQ5rR6sS7tT8uU9vV0wW1xX2yY3zZ',
                 email: 'jane.smith@khatabook.com',
-                phone: '+919876543211',
+                phone: '9876543211',
                 role: 'agent',
                 status: 'active',
                 createdAt: new Date().toISOString(),
@@ -114,8 +114,8 @@ function validateAgentData(agentData) {
         errors.push('Valid email is required');
     }
     
-    if (!agentData.phone || !/^\+91\d{10}$/.test(agentData.phone)) {
-        errors.push('Phone number must be in format +91XXXXXXXXXX');
+    if (!agentData.phone || !/^\d{10}$/.test(agentData.phone)) {
+        errors.push('Phone number must be a 10-digit number');
     }
     
     if (!agentData.password || agentData.password.length < 6) {

@@ -559,8 +559,8 @@ async function handleAddAgent(event) {
     if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         errors.push('Valid email is required');
     }
-    if (!formData.phone || !/^\+91\d{10}$/.test(formData.phone)) {
-        errors.push('Phone number must be in format +91XXXXXXXXXX');
+    if (!formData.phone || !/^\d{10}$/.test(formData.phone)) {
+        errors.push('Phone number must be a 10-digit number');
     }
     if (!formData.password || formData.password.length < 6) {
         errors.push('Password must be at least 6 characters long');
