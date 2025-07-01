@@ -1,9 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const fs = require('fs').promises;
-const path = require('path');
 const fetch = require('node-fetch');
+const path = require('path');
+const { getSupabase, initializeDefaultData } = require('./config/supabase');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,82 +12,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..')));
-
-// Data storage paths
-const DATA_DIR = path.join(__dirname, 'data');
-const AGENTS_FILE = path.join(DATA_DIR, 'agents.json');
-const LOGS_FILE = path.join(DATA_DIR, 'logs.json');
-
-// Ensure data directory exists
-async function ensureDataDir() {
-    try {
-        await fs.access(DATA_DIR);
-    } catch {
-        await fs.mkdir(DATA_DIR, { recursive: true });
-    }
-}
-
-// Initialize data files if they don't exist
-async function initializeDataFiles() {
-    await ensureDataDir();
-    
-    try {
-        await fs.access(AGENTS_FILE);
-    } catch {
-        await fs.writeFile(AGENTS_FILE, JSON.stringify([
-            {
-                id: 'AG001',
-                name: 'John Doe',
-                password: '$2a$10$rQZ8K9vL2mN3pO4qR5sT6uV7wX8yZ9aA0bB1cC2dE3fF4gG5hH6iI7jJ8kK9lL0mM1nN2oO3pP4qQ5rR6sS7tT8uU9vV0wW1xX2yY3zZ',
-                email: 'john.doe@khatabook.com',
-                phone: '9876543210',
-                role: 'agent',
-                status: 'active',
-                createdAt: new Date().toISOString(),
-                lastLogin: null
-            },
-            {
-                id: 'AG002',
-                name: 'Jane Smith',
-                password: '$2a$10$rQZ8K9vL2mN3pO4qR5sT6uV7wX8yZ9aA0bB1cC2dE3fF4gG5hH6iI7jJ8kK9lL0mM1nN2oO3pP4qQ5rR6sS7tT8uU9vV0wW1xX2yY3zZ',
-                email: 'jane.smith@khatabook.com',
-                phone: '9876543211',
-                role: 'agent',
-                status: 'active',
-                createdAt: new Date().toISOString(),
-                lastLogin: null
-            }
-        ], null, 2));
-    }
-    
-    try {
-        await fs.access(LOGS_FILE);
-    } catch {
-        await fs.writeFile(LOGS_FILE, JSON.stringify([], null, 2));
-    }
-}
-
-// Read data from file
-async function readDataFile(filePath) {
-    try {
-        const data = await fs.readFile(filePath, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error(`Error reading file ${filePath}:`, error);
-        return [];
-    }
-}
-
-// Write data to file
-async function writeDataFile(filePath, data) {
-    try {
-        await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-        return true;
-    } catch (error) {
-        console.error(`Error writing file ${filePath}:`, error);
-        return false;
-    }
-}
 
 // Generate unique agent ID
 function generateAgentId(existingAgents) {
@@ -130,7 +54,16 @@ function validateAgentData(agentData) {
 // Get all agents
 app.get('/api/agents', async (req, res) => {
     try {
-        const agents = await readDataFile(AGENTS_FILE);
+        const supabase = getSupabase();
+        const { data: agents, error } = await supabase
+            .from('agents')
+            .select('*');
+            
+        if (error) {
+            console.error('Error fetching agents:', error);
+            return res.status(500).json({ error: 'Failed to fetch agents' });
+        }
+        
         // Don't send password hashes in response
         const safeAgents = agents.map(agent => {
             const { password, ...safeAgent } = agent;
@@ -138,6 +71,7 @@ app.get('/api/agents', async (req, res) => {
         });
         res.json(safeAgents);
     } catch (error) {
+        console.error('Error fetching agents:', error);
         res.status(500).json({ error: 'Failed to fetch agents' });
     }
 });
@@ -145,7 +79,7 @@ app.get('/api/agents', async (req, res) => {
 // Create new agent
 app.post('/api/agents', async (req, res) => {
     try {
-        const agents = await readDataFile(AGENTS_FILE);
+        const supabase = getSupabase();
         const agentData = req.body;
         
         // Validate input
@@ -155,19 +89,33 @@ app.post('/api/agents', async (req, res) => {
         }
         
         // Check if email already exists
-        const emailExists = agents.some(agent => agent.email === agentData.email);
+        const { data: emailExists } = await supabase
+            .from('agents')
+            .select('id')
+            .eq('email', agentData.email)
+            .single();
+            
         if (emailExists) {
             return res.status(400).json({ error: 'Email already exists' });
         }
         
         // Check if Agent ID already exists
-        const agentIdExists = agents.some(agent => agent.id === agentData.agentId);
+        const { data: agentIdExists } = await supabase
+            .from('agents')
+            .select('id')
+            .eq('id', agentData.agentId)
+            .single();
+            
         if (agentIdExists) {
             return res.status(400).json({ error: 'Agent ID already exists' });
         }
         
         // Use provided Agent ID or generate one
-        const agentId = agentData.agentId || generateAgentId(agents);
+        const { data: existingAgents } = await supabase
+            .from('agents')
+            .select('id');
+            
+        const agentId = agentData.agentId || generateAgentId(existingAgents || []);
         
         // Hash password
         const saltRounds = 10;
@@ -182,15 +130,23 @@ app.post('/api/agents', async (req, res) => {
             password: hashedPassword,
             role: 'agent',
             status: 'active',
-            createdAt: new Date().toISOString(),
-            lastLogin: null
+            created_at: new Date().toISOString(),
+            last_login: null
         };
         
-        agents.push(newAgent);
-        await writeDataFile(AGENTS_FILE, agents);
+        const { data: insertedAgent, error: insertError } = await supabase
+            .from('agents')
+            .insert(newAgent)
+            .select()
+            .single();
+            
+        if (insertError) {
+            console.error('Error inserting agent:', insertError);
+            return res.status(500).json({ error: 'Failed to create agent' });
+        }
         
         // Return agent without password
-        const { password, ...safeAgent } = newAgent;
+        const { password, ...safeAgent } = insertedAgent;
         res.status(201).json(safeAgent);
         
     } catch (error) {
@@ -202,12 +158,18 @@ app.post('/api/agents', async (req, res) => {
 // Update agent
 app.put('/api/agents/:id', async (req, res) => {
     try {
-        const agents = await readDataFile(AGENTS_FILE);
+        const supabase = getSupabase();
         const agentId = req.params.id;
         const updateData = req.body;
         
-        const agentIndex = agents.findIndex(agent => agent.id === agentId);
-        if (agentIndex === -1) {
+        // Check if agent exists
+        const { data: existingAgent } = await supabase
+            .from('agents')
+            .select('*')
+            .eq('id', agentId)
+            .single();
+            
+        if (!existingAgent) {
             return res.status(404).json({ error: 'Agent not found' });
         }
         
@@ -222,27 +184,41 @@ app.put('/api/agents/:id', async (req, res) => {
         }
         
         // Check if email already exists (excluding current agent)
-        const emailExists = agents.some(agent => 
-            agent.email === updateData.email && agent.id !== agentId
-        );
+        const { data: emailExists } = await supabase
+            .from('agents')
+            .select('id')
+            .eq('email', updateData.email)
+            .neq('id', agentId)
+            .single();
+            
         if (emailExists) {
             return res.status(400).json({ error: 'Email already exists' });
         }
         
         // Update agent data
-        const updatedAgent = { ...agents[agentIndex] };
-        updatedAgent.name = updateData.name.trim();
-        updatedAgent.email = updateData.email.toLowerCase();
-        updatedAgent.phone = updateData.phone;
+        const updateFields = {
+            name: updateData.name.trim(),
+            email: updateData.email.toLowerCase(),
+            phone: updateData.phone
+        };
         
         // Update password if provided
         if (updateData.password) {
             const saltRounds = 10;
-            updatedAgent.password = await bcrypt.hash(updateData.password, saltRounds);
+            updateFields.password = await bcrypt.hash(updateData.password, saltRounds);
         }
         
-        agents[agentIndex] = updatedAgent;
-        await writeDataFile(AGENTS_FILE, agents);
+        const { data: updatedAgent, error: updateError } = await supabase
+            .from('agents')
+            .update(updateFields)
+            .eq('id', agentId)
+            .select()
+            .single();
+            
+        if (updateError) {
+            console.error('Error updating agent:', updateError);
+            return res.status(500).json({ error: 'Failed to update agent' });
+        }
         
         // Return agent without password
         const { password, ...safeAgent } = updatedAgent;
@@ -257,17 +233,18 @@ app.put('/api/agents/:id', async (req, res) => {
 // Delete agent
 app.delete('/api/agents/:id', async (req, res) => {
     try {
-        const agents = await readDataFile(AGENTS_FILE);
+        const supabase = getSupabase();
         const agentId = req.params.id;
         
-        const agentIndex = agents.findIndex(agent => agent.id === agentId);
-        if (agentIndex === -1) {
-            return res.status(404).json({ error: 'Agent not found' });
+        const { error } = await supabase
+            .from('agents')
+            .delete()
+            .eq('id', agentId);
+            
+        if (error) {
+            console.error('Error deleting agent:', error);
+            return res.status(500).json({ error: 'Failed to delete agent' });
         }
-        
-        // Remove agent
-        agents.splice(agentIndex, 1);
-        await writeDataFile(AGENTS_FILE, agents);
         
         res.json({ message: 'Agent deleted successfully' });
         
@@ -280,7 +257,7 @@ app.delete('/api/agents/:id', async (req, res) => {
 // Toggle agent status
 app.patch('/api/agents/:id/status', async (req, res) => {
     try {
-        const agents = await readDataFile(AGENTS_FILE);
+        const supabase = getSupabase();
         const agentId = req.params.id;
         const { status } = req.body;
         
@@ -288,15 +265,23 @@ app.patch('/api/agents/:id/status', async (req, res) => {
             return res.status(400).json({ error: 'Invalid status' });
         }
         
-        const agentIndex = agents.findIndex(agent => agent.id === agentId);
-        if (agentIndex === -1) {
+        const { data: updatedAgent, error } = await supabase
+            .from('agents')
+            .update({ status })
+            .eq('id', agentId)
+            .select()
+            .single();
+            
+        if (error) {
+            console.error('Error updating agent status:', error);
+            return res.status(500).json({ error: 'Failed to update agent status' });
+        }
+        
+        if (!updatedAgent) {
             return res.status(404).json({ error: 'Agent not found' });
         }
         
-        agents[agentIndex].status = status;
-        await writeDataFile(AGENTS_FILE, agents);
-        
-        const { password, ...safeAgent } = agents[agentIndex];
+        const { password, ...safeAgent } = updatedAgent;
         res.json(safeAgent);
         
     } catch (error) {
@@ -309,9 +294,15 @@ app.patch('/api/agents/:id/status', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { agentId, password } = req.body;
-        const agents = await readDataFile(AGENTS_FILE);
+        const supabase = getSupabase();
         
-        const agent = agents.find(a => a.id === agentId && a.status === 'active');
+        const { data: agent } = await supabase
+            .from('agents')
+            .select('*')
+            .eq('id', agentId)
+            .eq('status', 'active')
+            .single();
+            
         if (!agent) {
             return res.status(401).json({ error: 'Invalid credentials or inactive account' });
         }
@@ -322,8 +313,10 @@ app.post('/api/auth/login', async (req, res) => {
         }
         
         // Update last login
-        agent.lastLogin = new Date().toISOString();
-        await writeDataFile(AGENTS_FILE, agents);
+        await supabase
+            .from('agents')
+            .update({ last_login: new Date().toISOString() })
+            .eq('id', agentId);
         
         // Return agent without password
         const { password: _, ...safeAgent } = agent;
@@ -361,7 +354,17 @@ app.post('/api/auth/admin-login', async (req, res) => {
 // Get activity logs
 app.get('/api/logs', async (req, res) => {
     try {
-        const logs = await readDataFile(LOGS_FILE);
+        const supabase = getSupabase();
+        const { data: logs, error } = await supabase
+            .from('logs')
+            .select('*')
+            .order('timestamp', { ascending: false });
+            
+        if (error) {
+            console.error('Error fetching logs:', error);
+            return res.status(500).json({ error: 'Failed to fetch logs' });
+        }
+        
         res.json(logs);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch logs' });
@@ -371,16 +374,24 @@ app.get('/api/logs', async (req, res) => {
 // Add activity log
 app.post('/api/logs', async (req, res) => {
     try {
-        const logs = await readDataFile(LOGS_FILE);
+        const supabase = getSupabase();
         const logEntry = {
             ...req.body,
             timestamp: new Date().toISOString()
         };
         
-        logs.push(logEntry);
-        await writeDataFile(LOGS_FILE, logs);
+        const { data: insertedLog, error } = await supabase
+            .from('logs')
+            .insert(logEntry)
+            .select()
+            .single();
+            
+        if (error) {
+            console.error('Error inserting log:', error);
+            return res.status(500).json({ error: 'Failed to add log' });
+        }
         
-        res.status(201).json(logEntry);
+        res.status(201).json(insertedLog);
     } catch (error) {
         res.status(500).json({ error: 'Failed to add log' });
     }
@@ -712,7 +723,7 @@ app.post('/api/send-whatsapp-form', async (req, res) => {
         let whatsappFormUrl;
         if (language === 'hindi') {
             // Hindi WhatsApp form URL
-            whatsappFormUrl = `https://mediaapi.smsgupshup.com/GatewayAPI/rest?userid=2000186106&password=F4EUan&send_to=${phoneNumber}&v=1.1&format=json&msg_type=TEXT&method=SENDMESSAGE&msg=%E0%A4%B9%E0%A4%AE%E0%A5%87%E0%A4%82+%E0%A4%86%E0%A4%AA%E0%A4%95%E0%A4%BE+Khatabook+%E0%A4%AE%E0%A5%8B%E0%A4%AC%E0%A4%BE%E0%A4%87%E0%A4%B2+%E0%A4%A8%E0%A4%82%E0%A4%AC%E0%A4%B0+%E0%A4%AC%E0%A4%A6%E0%A4%B2%E0%A4%A8%E0%A5%87+%E0%A4%95%E0%A4%BE+%E0%A4%B0%E0%A4%BF%E0%A4%95%E0%A5%8D%E0%A4%B5%E0%A5%87%E0%A4%B8%E0%A5%8D%E0%A4%9F+%E0%A4%AE%E0%A4%BF%E0%A4%B2%E0%A4%BE+%E0%A4%B9%E0%A5%88%E0%A5%A4%0A%0A%E0%A4%95%E0%A5%83%E0%A4%AA%E0%A4%AF%E0%A4%BE+%E0%A4%AA%E0%A5%8D%E0%A4%B0%E0%A5%8B%E0%A4%B8%E0%A5%87%E0%A4%B8+%E0%A4%B6%E0%A5%81%E0%A4%B0%E0%A5%82+%E0%A4%95%E0%A4%B0%E0%A4%A8%E0%A5%87+%E0%A4%95%E0%A5%87+%E0%A4%B2%E0%A4%BF%E0%A4%8F+%E0%A4%A8%E0%A5%80%E0%A4%9A%E0%A5%87+%E0%A4%A6%E0%A4%BF%E0%A4%8F+%E0%A4%B2%E0%A4%BF%E0%A4%82%E0%A4%95+%E0%A4%AA%E0%A4%B0+%E0%A4%95%E0%A5%8D%E0%A4%B2%E0%A4%BF%E0%A4%95+%E0%A4%95%E0%A4%B0%E0%A5%87%E0%A4%82%E0%A5%A4&isTemplate=true`;
+            whatsappFormUrl = `https://mediaapi.smsgupshup.com/GatewayAPI/rest?userid=2000186106&password=F4EUan&send_to=${phoneNumber}&v=1.1&format=json&msg_type=TEXT&method=SENDMESSAGE&msg=%E0%A4%B9%E0%A4%AE%E0%A5%87%E0%A4%82+%E0%A4%86%E0%A4%AA%E0%A4%95%E0%A4%BE+Khatabook+%E0%A4%AE%E0%A5%8B%E0%A4%AC%E0%A4%BE%E0%A4%87%E0%A4%B2+%E0%A4%A8%E0%A4%82%E0%A4%AC%E0%A4%B0+%E0%A4%B0%E0%A5%8B%E0%A4%B2%E0%A5%87+%E0%A4%95%E0%A4%BE+%E0%A4%B0%E0%A4%BF%E0%A4%95%E0%A5%8D%E0%A4%B5%E0%A5%87%E0%A4%B8%E0%A5%8D%E0%A4%9F+%E0%A4%AE%E0%A4%BF%E0%A4%B2%E0%A4%BE+%E0%A4%B9%E0%A5%88%E0%A5%A4%0A%0A%E0%A4%95%E0%A5%83%E0%A4%AA%E0%A4%AF%E0%A4%BE+%E0%A4%AA%E0%A5%8D%E0%A4%B0%E0%A5%8B%E0%A4%B8%E0%A5%87%E0%A4%B8+%E0%A4%B6%E0%A5%81%E0%A4%B0%E0%A5%82+%E0%A4%95%E0%A4%B0%E0%A4%A8%E0%A5%87+%E0%A4%95%E0%A5%87+%E0%A4%B2%E0%A4%BF%E0%A4%8E+%E0%A4%A8%E0%A5%80%E0%A4%9C%E0%A5%87+%E0%A4%A6%E0%A4%BF%E0%A4%8E+%E0%A4%B2%E0%A4%BF%E0%A4%82%E0%A4%95+%E0%A4%AA%E0%A4%B0+%E0%A4%95%E0%A5%8D%E0%A4%B2%E0%A4%BF%E0%A4%95+%E0%A4%95%E0%A4%B0%E0%A5%87%E0%A4%82%E0%A5%A4&isTemplate=true`;
         } else {
             // English WhatsApp form URL (default)
             whatsappFormUrl = `https://mediaapi.smsgupshup.com/GatewayAPI/rest?userid=2000186106&password=F4EUan&send_to=${phoneNumber}&v=1.1&format=json&msg_type=TEXT&method=SENDMESSAGE&msg=We+have+recieved+your+request+to+change+your+registered+Khatabook+Phone+Number%0A%0APlease+click+on+the+link+below+to+proceed+with+the+process&isTemplate=true`;
@@ -929,7 +940,7 @@ app.get('/script.js', (req, res) => {
 
 // Initialize and start server
 async function startServer() {
-    await initializeDataFiles();
+    await initializeDefaultData();
     
     app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
