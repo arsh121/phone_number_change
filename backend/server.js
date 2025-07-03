@@ -365,8 +365,25 @@ app.get('/api/logs', async (req, res) => {
             return res.status(500).json({ error: 'Failed to fetch logs' });
         }
         
-        res.json(logs);
+        // Transform logs to match frontend expected format
+        const transformedLogs = logs.map(log => ({
+            timestamp: log.timestamp,
+            agentName: log.details?.agentName || 'Unknown',
+            agentId: log.agent_id || log.details?.agentId || 'Unknown',
+            customerId: log.details?.customerId || 'N/A',
+            oldPhone: log.details?.oldPhone || 'N/A',
+            newPhone: log.details?.newPhone || 'N/A',
+            otp: log.details?.otp || 'N/A',
+            channel: log.details?.channel || 'unknown',
+            messageType: log.details?.messageType || 'Unknown',
+            language: log.details?.language || '',
+            status: log.details?.status || 'unknown'
+        }));
+        
+        console.log('Fetched and transformed logs:', transformedLogs.length);
+        res.json(transformedLogs);
     } catch (error) {
+        console.error('Error fetching logs:', error);
         res.status(500).json({ error: 'Failed to fetch logs' });
     }
 });
@@ -375,10 +392,27 @@ app.get('/api/logs', async (req, res) => {
 app.post('/api/logs', async (req, res) => {
     try {
         const supabase = getSupabase();
+        
+        // Map frontend log data to Supabase table structure
         const logEntry = {
-            ...req.body,
-            timestamp: new Date().toISOString()
+            action: `${req.body.messageType} - ${req.body.channel}`,
+            details: {
+                agentName: req.body.agentName,
+                agentId: req.body.agentId,
+                customerId: req.body.customerId,
+                oldPhone: req.body.oldPhone,
+                newPhone: req.body.newPhone,
+                otp: req.body.otp,
+                channel: req.body.channel,
+                messageType: req.body.messageType,
+                language: req.body.language,
+                status: req.body.status
+            },
+            agent_id: req.body.agentId,
+            timestamp: req.body.timestamp || new Date().toISOString()
         };
+        
+        console.log('Inserting log entry:', logEntry);
         
         const { data: insertedLog, error } = await supabase
             .from('logs')
@@ -388,11 +422,13 @@ app.post('/api/logs', async (req, res) => {
             
         if (error) {
             console.error('Error inserting log:', error);
-            return res.status(500).json({ error: 'Failed to add log' });
+            return res.status(500).json({ error: 'Failed to add log', details: error });
         }
         
+        console.log('Log inserted successfully:', insertedLog);
         res.status(201).json(insertedLog);
     } catch (error) {
+        console.error('Log insertion error:', error);
         res.status(500).json({ error: 'Failed to add log' });
     }
 });
