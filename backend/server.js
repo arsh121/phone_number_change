@@ -433,6 +433,30 @@ app.post('/api/logs', async (req, res) => {
     }
 });
 
+// Use a webhook service as proxy to reach SMSGupshup
+async function sendSMSThroughProxy(smsUrl) {
+    try {
+        // Option 1: Use webhook.site or similar service
+        const proxyUrl = process.env.WEBHOOK_PROXY_URL || 'https://webhook.site';
+        
+        // For now, we'll log and suggest using a third-party proxy
+        console.log('Attempting to send SMS through proxy...');
+        console.log('Note: You may need to set up a custom webhook service or proxy');
+        
+        // Direct attempt with fallback message
+        return await fetch(smsUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Khatabook-NumberChange/1.0'
+            }
+        });
+    } catch (error) {
+        console.error('Proxy attempt failed:', error);
+        throw error;
+    }
+}
+
 // Test SMS API connectivity endpoint
 app.get('/api/test-sms-connectivity', async (req, res) => {
     try {
@@ -597,11 +621,21 @@ app.post('/api/send-sms', async (req, res) => {
         
         console.log('SMS API URL:', smsUrl);
         
+        // Use proxy if available (for Render compatibility)
+        let finalUrl = smsUrl;
+        let useProxy = false;
+        
+        if (process.env.SMS_PROXY_URL) {
+            finalUrl = `${process.env.SMS_PROXY_URL}?url=${encodeURIComponent(smsUrl)}`;
+            useProxy = true;
+            console.log('Using SMS proxy:', process.env.SMS_PROXY_URL);
+        }
+        
         // Create timeout controller with reduced timeout for Render
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced to 10s
         
-        const response = await fetch(smsUrl, {
+        const response = await fetch(finalUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -612,27 +646,40 @@ app.post('/api/send-sms', async (req, res) => {
         
         clearTimeout(timeoutId);
         
-        console.log('SMS API response status:', response.status);
-        console.log('SMS API response headers:', Object.fromEntries(response.headers.entries()));
-        
-        // Get response text first
-        const responseText = await response.text();
-        console.log('SMS API response text:', responseText);
-        
         let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('Failed to parse SMS API response as JSON:', parseError);
-            console.log('Raw SMS response:', responseText);
+        
+        // Handle proxy response format
+        if (useProxy) {
+            const proxyData = await response.json();
+            if (!proxyData.success) {
+                throw new Error(proxyData.error || 'Proxy request failed');
+            }
+            // Parse the proxied data
+            data = JSON.parse(proxyData.data);
+            console.log('Proxy response received and parsed');
+        } else {
+            // Direct response handling
+            console.log('SMS API response status:', response.status);
+            console.log('SMS API response headers:', Object.fromEntries(response.headers.entries()));
             
-            return res.status(500).json({
-                success: false,
-                message: 'Invalid response from SMS API',
-                error: 'Response is not valid JSON',
-                rawResponse: responseText,
-                status: response.status
-            });
+            // Get response text first
+            const responseText = await response.text();
+            console.log('SMS API response text:', responseText);
+            
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('Failed to parse SMS API response as JSON:', parseError);
+                console.log('Raw SMS response:', responseText);
+                
+                return res.status(500).json({
+                    success: false,
+                    message: 'Invalid response from SMS API',
+                    error: 'Response is not valid JSON',
+                    rawResponse: responseText,
+                    status: response.status
+                });
+            }
         }
         
         console.log('Parsed SMS API response:', JSON.stringify(data, null, 2));
