@@ -433,6 +433,55 @@ app.post('/api/logs', async (req, res) => {
     }
 });
 
+// Test SMS API connectivity endpoint
+app.get('/api/test-sms-connectivity', async (req, res) => {
+    try {
+        const testUrl = 'https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=916366116150&msg=TEST&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007194642344586649';
+        
+        console.log('Testing SMS connectivity from Render...');
+        console.log('Test URL:', testUrl);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        const startTime = Date.now();
+        const response = await fetch(testUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            signal: controller.signal
+        });
+        const duration = Date.now() - startTime;
+        
+        clearTimeout(timeoutId);
+        
+        console.log('Response status:', response.status);
+        console.log('Response time:', duration, 'ms');
+        
+        const responseText = await response.text();
+        console.log('Response text:', responseText);
+        
+        res.json({
+            success: true,
+            status: response.status,
+            duration: duration + 'ms',
+            response: responseText,
+            canConnect: true
+        });
+    } catch (error) {
+        console.error('Connectivity test failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            errorName: error.name,
+            errorCode: error.code,
+            canConnect: false,
+            details: JSON.stringify(error, Object.getOwnPropertyNames(error))
+        });
+    }
+});
+
 // CleverTap API endpoint for push notifications
 app.post('/api/send-push-notification', async (req, res) => {
     try {
