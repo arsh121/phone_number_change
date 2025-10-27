@@ -548,13 +548,19 @@ app.post('/api/send-sms', async (req, res) => {
         
         console.log('SMS API URL:', smsUrl);
         
+        // Create timeout controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const response = await fetch(smsUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             },
-            signal: AbortSignal.timeout(30000) // 30 second timeout
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('SMS API response status:', response.status);
         console.log('SMS API response headers:', Object.fromEntries(response.headers.entries()));
@@ -668,13 +674,19 @@ app.post('/api/send-whatsapp', async (req, res) => {
         
         console.log('WhatsApp API URL:', whatsappUrl);
         
+        // Create timeout controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const response = await fetch(whatsappUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             },
-            signal: AbortSignal.timeout(30000) // 30 second timeout
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('WhatsApp API response status:', response.status);
         console.log('WhatsApp API response headers:', Object.fromEntries(response.headers.entries()));
@@ -782,13 +794,19 @@ app.post('/api/send-whatsapp-form', async (req, res) => {
         
         console.log('WhatsApp Form API URL:', whatsappFormUrl);
         
+        // Create timeout controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const response = await fetch(whatsappFormUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             },
-            signal: AbortSignal.timeout(30000) // 30 second timeout
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('WhatsApp Form API response status:', response.status);
         console.log('WhatsApp Form API response headers:', Object.fromEntries(response.headers.entries()));
@@ -899,13 +917,19 @@ app.post('/api/send-sms-form', async (req, res) => {
         
         console.log('SMS Form API URL:', smsFormUrl);
         
+        // Create timeout controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const response = await fetch(smsFormUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             },
-            signal: AbortSignal.timeout(30000) // 30 second timeout
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('SMS Form API response status:', response.status);
         console.log('SMS Form API response headers:', Object.fromEntries(response.headers.entries()));
