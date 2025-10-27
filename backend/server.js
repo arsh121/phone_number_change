@@ -597,14 +597,15 @@ app.post('/api/send-sms', async (req, res) => {
         
         console.log('SMS API URL:', smsUrl);
         
-        // Create timeout controller
+        // Create timeout controller with reduced timeout for Render
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced to 10s
         
         const response = await fetch(smsUrl, {
             method: 'GET',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'User-Agent': 'Khatabook-NumberChange/1.0'
             },
             signal: controller.signal
         });
