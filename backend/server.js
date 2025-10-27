@@ -622,14 +622,25 @@ app.post('/api/send-sms', async (req, res) => {
         
     } catch (error) {
         console.error('SMS API error:', error);
+        console.error('Error details:', {
+            name: error.name,
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
+        
+        // Log the full error to help debug
+        console.log('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
         
         // Handle timeout/connection errors specifically
-        if (error.name === 'AbortError' || error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') {
+        if (error.name === 'AbortError' || error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET' || error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+            console.error('Timeout or connection error detected on Render - SMSGupshup may be blocked by network restrictions');
             return res.status(504).json({ 
                 success: false, 
-                message: 'SMS service timeout - please try again', 
-                error: 'Connection to SMS service timed out',
-                errorDetails: error.message
+                message: 'SMS service unreachable - network timeout', 
+                error: 'Could not connect to SMS service. This may be due to network restrictions on Render.',
+                errorDetails: error.message,
+                suggestion: 'Please contact administrator to check SMS service connectivity'
             });
         }
         
@@ -638,7 +649,8 @@ app.post('/api/send-sms', async (req, res) => {
             message: 'Failed to send SMS', 
             error: error.message,
             errorType: error.name,
-            errorCode: error.code
+            errorCode: error.code,
+            errorDetails: error.stack
         });
     }
 });
