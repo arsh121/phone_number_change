@@ -672,7 +672,8 @@ app.post('/api/send-whatsapp', async (req, res) => {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(30000) // 30 second timeout
         });
         
         console.log('WhatsApp API response status:', response.status);
@@ -785,7 +786,8 @@ app.post('/api/send-whatsapp-form', async (req, res) => {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(30000) // 30 second timeout
         });
         
         console.log('WhatsApp Form API response status:', response.status);
@@ -901,7 +903,8 @@ app.post('/api/send-sms-form', async (req, res) => {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(30000) // 30 second timeout
         });
         
         console.log('SMS Form API response status:', response.status);
