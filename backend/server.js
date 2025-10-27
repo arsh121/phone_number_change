@@ -552,7 +552,8 @@ app.post('/api/send-sms', async (req, res) => {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(30000) // 30 second timeout
         });
         
         console.log('SMS API response status:', response.status);
@@ -615,10 +616,23 @@ app.post('/api/send-sms', async (req, res) => {
         
     } catch (error) {
         console.error('SMS API error:', error);
+        
+        // Handle timeout/connection errors specifically
+        if (error.name === 'AbortError' || error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') {
+            return res.status(504).json({ 
+                success: false, 
+                message: 'SMS service timeout - please try again', 
+                error: 'Connection to SMS service timed out',
+                errorDetails: error.message
+            });
+        }
+        
         res.status(500).json({ 
             success: false, 
-            message: 'Internal server error', 
-            error: error.message 
+            message: 'Failed to send SMS', 
+            error: error.message,
+            errorType: error.name,
+            errorCode: error.code
         });
     }
 });
