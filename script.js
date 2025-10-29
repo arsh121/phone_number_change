@@ -791,25 +791,45 @@ async function sendPushNotification(customerId, otp, button, originalText) {
 
 async function sendSMS(oldPhone, otp, button, originalText) {
     try {
-        const response = await fetch(`${API_BASE_URL}/send-sms`, {
-            method: 'POST',
+        // Format phone number (add 91 prefix if not present)
+        let phoneNumber = oldPhone;
+        if (!phoneNumber.startsWith('91')) {
+            phoneNumber = '91' + phoneNumber;
+        }
+        
+        // Direct SMSGupshup API call from frontend
+        const smsUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=${phoneNumber}&msg=Your%20Khatabook%20verification%20OTP%20is%20${otp}&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007194642344586649`;
+        
+        console.log('Calling SMSGupshup directly from frontend:', smsUrl);
+        
+        const response = await fetch(smsUrl, {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                oldPhone: oldPhone,
-                otp: otp
-            })
+                'Accept': 'application/json'
+            }
         });
         
-        const data = await response.json();
+        console.log('SMSGupshup response status:', response.status);
         
-        if (data.success) {
+        const responseText = await response.text();
+        console.log('SMSGupshup response:', responseText);
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Failed to parse SMS response:', parseError);
+            throw new Error('Invalid response from SMS service');
+        }
+        
+        // SMSGupshup response format: { "response": { "status": "success", ... } }
+        if (data.response && data.response.status === 'success') {
             logActivity('OTP', 'sms', 'success');
             showStatusMessage('SMS sent successfully!', 'success');
         } else {
+            const errorMsg = data.response?.details || data.response?.status || 'Unknown error';
             logActivity('OTP', 'sms', 'failed');
-            showStatusMessage(`Failed to send SMS: ${data.error}`, 'error');
+            showStatusMessage(`Failed to send SMS: ${errorMsg}`, 'error');
         }
     } catch (error) {
         console.error('SMS error:', error);
@@ -925,25 +945,54 @@ async function sendWhatsAppForm(newPhone, language, button, originalText) {
 
 async function sendSMSForm(newPhone, language, button, originalText) {
     try {
-        const response = await fetch(`${API_BASE_URL}/send-sms-form`, {
-            method: 'POST',
+        // Format phone number (remove +91 if present, ensure it's 10 digits)
+        let phoneNumber = newPhone.replace('+91', '').replace(/\s/g, '');
+        
+        if (!/^\d{10}$/.test(phoneNumber)) {
+            showStatusMessage('Invalid phone number format. Please enter a 10-digit number.', 'error');
+            return;
+        }
+        
+        // Direct SMSGupshup API call from frontend
+        let smsFormUrl;
+        if (language === 'hindi') {
+            // Hindi SMS form URL
+            smsFormUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=91${phoneNumber}&msg=We%20have%20received%20your%20request%20to%20update%20your%20Khatabook%20phone%20number.%20Click%20the%20link%20to%20complete%20the%20process%3A%20https://forms.gle/RxSM1cFmpqJ5E5dp9&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007657052465213311`;
+        } else {
+            // English SMS form URL
+            smsFormUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=91${phoneNumber}&msg=We%20have%20received%20your%20request%20to%20update%20your%20Khatabook%20phone%20number.%20Click%20the%20link%20to%20complete%20the%20process%3A%20https://forms.gle/kXKU5HCtrjKDYZPH9&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007657052465213311`;
+        }
+        
+        console.log('Calling SMSGupshup form API directly from frontend:', smsFormUrl);
+        
+        const response = await fetch(smsFormUrl, {
+            method: 'GET',
             headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                newPhone: newPhone,
-                language: language
-            })
+                'Accept': 'application/json'
+            }
         });
         
-        const data = await response.json();
+        console.log('SMSGupshup form response status:', response.status);
         
-        if (data.success) {
+        const responseText = await response.text();
+        console.log('SMSGupshup form response:', responseText);
+        
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Failed to parse SMS form response:', parseError);
+            throw new Error('Invalid response from SMS service');
+        }
+        
+        // SMSGupshup response format: { "response": { "status": "success", ... } }
+        if (data.response && data.response.status === 'success') {
             logActivity('Form', 'sms', 'success', language);
             showStatusMessage(`SMS form (${language}) sent successfully!`, 'success');
         } else {
+            const errorMsg = data.response?.details || data.response?.status || 'Unknown error';
             logActivity('Form', 'sms', 'failed', language);
-            showStatusMessage(`Failed to send SMS form (${language}): ${data.error}`, 'error');
+            showStatusMessage(`Failed to send SMS form (${language}): ${errorMsg}`, 'error');
         }
     } catch (error) {
         console.error('SMS Form error:', error);
