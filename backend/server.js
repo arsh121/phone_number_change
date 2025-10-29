@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const fetch = require('node-fetch');
+// Use native fetch (Node 18+) or fallback to node-fetch
+const fetch = globalThis.fetch || require('node-fetch');
 const path = require('path');
 const { getSupabase, initializeDefaultData } = require('./config/supabase');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -621,65 +623,103 @@ app.post('/api/send-sms', async (req, res) => {
         
         console.log('SMS API URL:', smsUrl);
         
-        // Use proxy if available (for Render compatibility)
-        let finalUrl = smsUrl;
-        let useProxy = false;
+        // Retry logic for Render network issues
+        const maxRetries = 3;
+        let lastError = null;
+        let data = null;
+        let response = null;
+        let timeoutId = null;
         
-        if (process.env.SMS_PROXY_URL) {
-            finalUrl = `${process.env.SMS_PROXY_URL}?url=${encodeURIComponent(smsUrl)}`;
-            useProxy = true;
-            console.log('Using SMS proxy:', process.env.SMS_PROXY_URL);
-        }
-        
-        // Create timeout controller with reduced timeout for Render
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced to 10s
-        
-        const response = await fetch(finalUrl, {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`SMS request attempt ${attempt}/${maxRetries}`);
+                
+                // Create timeout controller with longer timeout for Render
+                const controller = new AbortController();
+                timeoutId = setTimeout(() => {
+                    controller.abort();
+                }, attempt === 1 ? 15000 : 30000); // First attempt: 15s, retries: 30s
+                
+                // Try with native fetch and improved options
+                const fetchOptions = {
             method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'Khatabook-NumberChange/1.0'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        let data;
-        
-        // Handle proxy response format
-        if (useProxy) {
-            const proxyData = await response.json();
-            if (!proxyData.success) {
-                throw new Error(proxyData.error || 'Proxy request failed');
-            }
-            // Parse the proxied data
-            data = JSON.parse(proxyData.data);
-            console.log('Proxy response received and parsed');
-        } else {
-            // Direct response handling
-            console.log('SMS API response status:', response.status);
-            console.log('SMS API response headers:', Object.fromEntries(response.headers.entries()));
-            
-            // Get response text first
-            const responseText = await response.text();
-            console.log('SMS API response text:', responseText);
-            
-            try {
-                data = JSON.parse(responseText);
-            } catch (parseError) {
-                console.error('Failed to parse SMS API response as JSON:', parseError);
-                console.log('Raw SMS response:', responseText);
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'Khatabook-NumberChange/1.0',
+                        'Connection': 'keep-alive',
+                        'Accept': 'application/json'
+                    },
+                    signal: controller.signal,
+                    redirect: 'follow'
+                };
                 
-                return res.status(500).json({
-                    success: false,
-                    message: 'Invalid response from SMS API',
-                    error: 'Response is not valid JSON',
-                    rawResponse: responseText,
-                    status: response.status
-                });
+                // Add keep-alive agent for better connection reuse (if using node-fetch)
+                // Note: Native fetch doesn't use agent, but node-fetch v2 might
+                try {
+                    if (!globalThis.fetch || fetch.name !== 'fetch') {
+                        fetchOptions.agent = new https.Agent({
+                            keepAlive: true,
+                            keepAliveMsecs: 1000,
+                            maxSockets: 1,
+                            maxFreeSockets: 1
+                        });
+                    }
+                } catch (agentError) {
+                    // Ignore if agent not supported
+                    console.log('Agent option not supported, continuing without it');
+                }
+                
+                response = await fetch(smsUrl, fetchOptions);
+                clearTimeout(timeoutId);
+                
+                // Check if response is ok
+                if (!response.ok && response.status !== 200) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+        
+        console.log('SMS API response status:', response.status);
+        console.log('SMS API response headers:', Object.fromEntries(response.headers.entries()));
+        
+                // Get response text
+        const responseText = await response.text();
+        console.log('SMS API response text:', responseText);
+        
+                // Parse JSON
+        try {
+            data = JSON.parse(responseText);
+                    break; // Success, exit retry loop
+        } catch (parseError) {
+            console.error('Failed to parse SMS API response as JSON:', parseError);
+            console.log('Raw SMS response:', responseText);
+            
+            return res.status(500).json({
+                success: false,
+                message: 'Invalid response from SMS API',
+                error: 'Response is not valid JSON',
+                rawResponse: responseText,
+                status: response.status
+            });
+                }
+                
+            } catch (error) {
+                if (timeoutId) clearTimeout(timeoutId);
+                lastError = error;
+                console.error(`SMS attempt ${attempt} failed:`, error.message);
+                
+                if (attempt < maxRetries) {
+                    // Wait before retrying (exponential backoff)
+                    const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+                    console.log(`Retrying in ${waitTime}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                } else {
+                    // All retries failed
+                    throw error;
+                }
             }
+        }
+        
+        if (!data) {
+            throw lastError || new Error('Failed to get response from SMS API');
         }
         
         console.log('Parsed SMS API response:', JSON.stringify(data, null, 2));
