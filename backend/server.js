@@ -593,15 +593,19 @@ app.post('/api/send-push-notification', async (req, res) => {
 });
 
 // Simple SMS proxy endpoint - just forwards request with CORS
+// Handle OPTIONS preflight
+app.options('/api/proxy-sms', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+});
+
 app.get('/api/proxy-sms', async (req, res) => {
     // Set CORS headers to allow frontend calls
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
-    
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
     
     try {
         const { url } = req.query;

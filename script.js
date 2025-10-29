@@ -803,14 +803,30 @@ async function sendSMS(oldPhone, otp, button, originalText) {
         console.log('Calling SMS via backend proxy:', smsUrl);
         
         // Use backend proxy endpoint to avoid CORS
-        const response = await fetch(`${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsUrl)}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        const proxyUrl = `${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsUrl)}`;
+        console.log('Calling proxy endpoint:', proxyUrl);
+        console.log('API_BASE_URL is:', API_BASE_URL);
+        
+        let response;
+        try {
+            response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+        } catch (fetchError) {
+            console.error('Fetch error:', fetchError);
+            throw new Error(`Network error: ${fetchError.message}. Make sure backend is running at ${API_BASE_URL}`);
+        }
         
         console.log('Proxy response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Proxy error response:', errorText);
+            throw new Error(`Proxy error: ${response.status} - ${errorText}`);
+        }
         
         const proxyData = await response.json();
         console.log('Proxy response:', proxyData);
@@ -971,14 +987,29 @@ async function sendSMSForm(newPhone, language, button, originalText) {
         console.log('Calling SMS form via backend proxy:', smsFormUrl);
         
         // Use backend proxy endpoint to avoid CORS
-        const response = await fetch(`${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsFormUrl)}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        const proxyUrl = `${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsFormUrl)}`;
+        console.log('Calling proxy endpoint:', proxyUrl);
+        
+        let response;
+        try {
+            response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+        } catch (fetchError) {
+            console.error('Fetch error:', fetchError);
+            throw new Error(`Network error: ${fetchError.message}. Make sure backend is running at ${API_BASE_URL}`);
+        }
         
         console.log('Proxy form response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Proxy error response:', errorText);
+            throw new Error(`Proxy error: ${response.status} - ${errorText}`);
+        }
         
         const proxyData = await response.json();
         console.log('Proxy form response:', proxyData);
