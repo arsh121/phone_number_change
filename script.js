@@ -797,15 +797,15 @@ async function sendSMS(oldPhone, otp, button, originalText) {
             phoneNumber = '91' + phoneNumber;
         }
         
-        // Call SMSGupshup via backend proxy (to avoid CORS issues)
+        // Construct SMSGupshup URL
         const smsUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=${phoneNumber}&msg=Your%20Khatabook%20verification%20OTP%20is%20${otp}&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007194642344586649`;
         
-        console.log('Calling SMS via backend proxy:', smsUrl);
+        console.log('Calling SMSGupshup via public CORS proxy:', smsUrl);
         
-        // Use backend proxy endpoint to avoid CORS
-        const proxyUrl = `${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsUrl)}`;
-        console.log('Calling proxy endpoint:', proxyUrl);
-        console.log('API_BASE_URL is:', API_BASE_URL);
+        // Use public CORS proxy since Render blocks direct connections
+        // This proxy works from browser and bypasses CORS
+        const corsProxy = 'https://corsproxy.io/?';
+        const proxyUrl = corsProxy + encodeURIComponent(smsUrl);
         
         let response;
         try {
@@ -817,10 +817,10 @@ async function sendSMS(oldPhone, otp, button, originalText) {
             });
         } catch (fetchError) {
             console.error('Fetch error:', fetchError);
-            throw new Error(`Network error: ${fetchError.message}. Make sure backend is running at ${API_BASE_URL}`);
+            throw new Error(`Network error: ${fetchError.message}`);
         }
         
-        console.log('Proxy response status:', response.status);
+        console.log('CORS proxy response status:', response.status);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -828,16 +828,11 @@ async function sendSMS(oldPhone, otp, button, originalText) {
             throw new Error(`Proxy error: ${response.status} - ${errorText}`);
         }
         
-        const proxyData = await response.json();
-        console.log('Proxy response:', proxyData);
-        
-        if (!proxyData.success) {
-            throw new Error(proxyData.error || 'Proxy request failed');
-        }
-        
         let data;
         try {
-            data = JSON.parse(proxyData.data);
+            const responseText = await response.text();
+            console.log('Proxy response text:', responseText);
+            data = JSON.parse(responseText);
         } catch (parseError) {
             console.error('Failed to parse SMS response:', parseError);
             throw new Error('Invalid response from SMS service');
@@ -974,7 +969,7 @@ async function sendSMSForm(newPhone, language, button, originalText) {
             return;
         }
         
-        // Call SMSGupshup via backend proxy (to avoid CORS issues)
+        // Construct SMSGupshup URL for form
         let smsFormUrl;
         if (language === 'hindi') {
             // Hindi SMS form URL
@@ -984,11 +979,11 @@ async function sendSMSForm(newPhone, language, button, originalText) {
             smsFormUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=91${phoneNumber}&msg=We%20have%20received%20your%20request%20to%20update%20your%20Khatabook%20phone%20number.%20Click%20the%20link%20to%20complete%20the%20process%3A%20https://forms.gle/kXKU5HCtrjKDYZPH9&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007657052465213311`;
         }
         
-        console.log('Calling SMS form via backend proxy:', smsFormUrl);
+        console.log('Calling SMS form via public CORS proxy:', smsFormUrl);
         
-        // Use backend proxy endpoint to avoid CORS
-        const proxyUrl = `${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsFormUrl)}`;
-        console.log('Calling proxy endpoint:', proxyUrl);
+        // Use public CORS proxy since Render blocks direct connections
+        const corsProxy = 'https://corsproxy.io/?';
+        const proxyUrl = corsProxy + encodeURIComponent(smsFormUrl);
         
         let response;
         try {
@@ -1000,10 +995,10 @@ async function sendSMSForm(newPhone, language, button, originalText) {
             });
         } catch (fetchError) {
             console.error('Fetch error:', fetchError);
-            throw new Error(`Network error: ${fetchError.message}. Make sure backend is running at ${API_BASE_URL}`);
+            throw new Error(`Network error: ${fetchError.message}`);
         }
         
-        console.log('Proxy form response status:', response.status);
+        console.log('CORS proxy form response status:', response.status);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -1011,16 +1006,11 @@ async function sendSMSForm(newPhone, language, button, originalText) {
             throw new Error(`Proxy error: ${response.status} - ${errorText}`);
         }
         
-        const proxyData = await response.json();
-        console.log('Proxy form response:', proxyData);
-        
-        if (!proxyData.success) {
-            throw new Error(proxyData.error || 'Proxy request failed');
-        }
-        
         let data;
         try {
-            data = JSON.parse(proxyData.data);
+            const responseText = await response.text();
+            console.log('Proxy form response text:', responseText);
+            data = JSON.parse(responseText);
         } catch (parseError) {
             console.error('Failed to parse SMS form response:', parseError);
             throw new Error('Invalid response from SMS service');
