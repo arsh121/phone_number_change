@@ -797,26 +797,31 @@ async function sendSMS(oldPhone, otp, button, originalText) {
             phoneNumber = '91' + phoneNumber;
         }
         
-        // Direct SMSGupshup API call from frontend
+        // Call SMSGupshup via backend proxy (to avoid CORS issues)
         const smsUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=${phoneNumber}&msg=Your%20Khatabook%20verification%20OTP%20is%20${otp}&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007194642344586649`;
         
-        console.log('Calling SMSGupshup directly from frontend:', smsUrl);
+        console.log('Calling SMS via backend proxy:', smsUrl);
         
-        const response = await fetch(smsUrl, {
+        // Use backend proxy endpoint to avoid CORS
+        const response = await fetch(`${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsUrl)}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
             }
         });
         
-        console.log('SMSGupshup response status:', response.status);
+        console.log('Proxy response status:', response.status);
         
-        const responseText = await response.text();
-        console.log('SMSGupshup response:', responseText);
+        const proxyData = await response.json();
+        console.log('Proxy response:', proxyData);
+        
+        if (!proxyData.success) {
+            throw new Error(proxyData.error || 'Proxy request failed');
+        }
         
         let data;
         try {
-            data = JSON.parse(responseText);
+            data = JSON.parse(proxyData.data);
         } catch (parseError) {
             console.error('Failed to parse SMS response:', parseError);
             throw new Error('Invalid response from SMS service');
@@ -953,7 +958,7 @@ async function sendSMSForm(newPhone, language, button, originalText) {
             return;
         }
         
-        // Direct SMSGupshup API call from frontend
+        // Call SMSGupshup via backend proxy (to avoid CORS issues)
         let smsFormUrl;
         if (language === 'hindi') {
             // Hindi SMS form URL
@@ -963,23 +968,28 @@ async function sendSMSForm(newPhone, language, button, originalText) {
             smsFormUrl = `https://enterprise.smsgupshup.com/GatewayAPI/rest?userid=2000193891&password=x394F4ge&send_to=91${phoneNumber}&msg=We%20have%20received%20your%20request%20to%20update%20your%20Khatabook%20phone%20number.%20Click%20the%20link%20to%20complete%20the%20process%3A%20https://forms.gle/kXKU5HCtrjKDYZPH9&method=SendMessage&format=JSON&v=1.1&auth_scheme=Plain&msg_type=Text&principalEntityId=1601100000000000654&dltTemplateId=1007657052465213311`;
         }
         
-        console.log('Calling SMSGupshup form API directly from frontend:', smsFormUrl);
+        console.log('Calling SMS form via backend proxy:', smsFormUrl);
         
-        const response = await fetch(smsFormUrl, {
+        // Use backend proxy endpoint to avoid CORS
+        const response = await fetch(`${API_BASE_URL}/proxy-sms?url=${encodeURIComponent(smsFormUrl)}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
             }
         });
         
-        console.log('SMSGupshup form response status:', response.status);
+        console.log('Proxy form response status:', response.status);
         
-        const responseText = await response.text();
-        console.log('SMSGupshup form response:', responseText);
+        const proxyData = await response.json();
+        console.log('Proxy form response:', proxyData);
+        
+        if (!proxyData.success) {
+            throw new Error(proxyData.error || 'Proxy request failed');
+        }
         
         let data;
         try {
-            data = JSON.parse(responseText);
+            data = JSON.parse(proxyData.data);
         } catch (parseError) {
             console.error('Failed to parse SMS form response:', parseError);
             throw new Error('Invalid response from SMS service');

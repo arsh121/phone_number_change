@@ -592,6 +592,64 @@ app.post('/api/send-push-notification', async (req, res) => {
     }
 });
 
+// Simple SMS proxy endpoint - just forwards request with CORS
+app.get('/api/proxy-sms', async (req, res) => {
+    // Set CORS headers to allow frontend calls
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    
+    try {
+        const { url } = req.query;
+        
+        if (!url) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'URL parameter is required' 
+            });
+        }
+        
+        console.log('Proxying SMS request to:', url);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        const response = await fetch(decodeURIComponent(url), {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'Khatabook-Proxy/1.0'
+            },
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const responseText = await response.text();
+        
+        console.log('Proxy response status:', response.status);
+        console.log('Proxy response:', responseText);
+        
+        res.json({
+            success: true,
+            status: response.status,
+            data: responseText
+        });
+        
+    } catch (error) {
+        console.error('SMS Proxy error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            errorCode: error.code
+        });
+    }
+});
+
 // SMS API endpoint using SMSGupshup
 app.post('/api/send-sms', async (req, res) => {
     try {
